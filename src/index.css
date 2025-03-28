@@ -147,3 +147,77 @@ button:focus-visible {
      color: rgba(0, 0, 0, 0.6);
    }
 }
+
+
+/* Add these styles */
+
+/* Adjust upload section if needed */
+.upload-section {
+  background-color: var(--section-bg);
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  text-align: left;
+}
+
+.upload-section h2 {
+   margin-top: 0;
+   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+   padding-bottom: 0.5rem;
+   margin-bottom: 1rem;
+}
+
+.upload-section input[type="file"] {
+  display: block;
+  margin-bottom: 1rem;
+  color: inherit;
+  padding: 0.5em 0.75em;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.05);
+  max-width: 100%; /* Ensure it doesn't overflow */
+}
+
+/* Styles for the PDF content display */
+.pdf-content-section {
+  background-color: var(--section-bg);
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  text-align: left;
+}
+
+.pdf-content-section h2 {
+  margin-top: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.pdf-text-display {
+  white-space: pre-wrap; /* Allow text to wrap */
+  word-wrap: break-word; /* Break long words */
+  background-color: rgba(0, 0, 0, 0.1); /* Slightly different background */
+  padding: 1rem;
+  border-radius: 4px;
+  max-height: 500px; /* Limit height and make scrollable */
+  overflow-y: auto;
+  font-family: monospace; /* Use monospace for better text alignment */
+  font-size: 0.9em;
+  color: inherit; /* Inherit text color */
+}
+
+/* Light mode adjustments */
+@media (prefers-color-scheme: light) {
+  .upload-section h2,
+  .pdf-content-section h2 {
+     border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  }
+   .upload-section input[type="file"] {
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    background-color: rgba(0, 0, 0, 0.02);
+  }
+  .pdf-text-display {
+     background-color: rgba(0, 0, 0, 0.05);
+  }
+}
