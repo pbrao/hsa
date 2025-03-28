@@ -4,14 +4,9 @@ function App() {
   return (
     <div className="app-container">
       <header className="app-header">
-        <h1>Welcome to Your React App</h1>
-        <p>A simple, modern single-page application.</p>
+        <h1>HSA Receipt Tracker</h1>
       </header>
       <main className="app-main">
-        <section>
-          <h2>Getting Started</h2>
-          <p>Edit <code>src/App.jsx</code> and save to see changes.</p>
-        </section>
         <section className="file-input-section">
           <h2>Upload Your File</h2>
           <label htmlFor="file-upload" className="file-input-label">
