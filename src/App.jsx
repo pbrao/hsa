@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 // No other imports needed for this change
 
 function App() {
-  const [selectedFile, setSelectedFile] = useState(null);
+  // Remove selectedFile state
+  // const [selectedFile, setSelectedFile] = useState(null);
   // Remove extractedData state
   // const [extractedData, setExtractedData] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -13,34 +14,22 @@ function App() {
   const [debugPrompt, setDebugPrompt] = useState('');
   const [debugRawResponse, setDebugRawResponse] = useState('');
 
+  // Remove handleFileChange function
+  /*
   const handleFileChange = (event) => {
-    const file = event.target.files[0];
-    // Reset state when a new file is selected or selection is cleared
-    setSelectedFile(null);
-    // Remove setExtractedData
-    // setExtractedData(null);
-    setProcessingError('');
-    // Clear debug info as well
-    setDebugPrompt('');
-    setDebugRawResponse('');
-
-    if (file && file.type === 'application/pdf') {
-      setSelectedFile(file);
-      console.log("PDF file selected:", file.name);
-    } else {
-      setSelectedFile(null); // Ensure state is null if not PDF
-      if (file) { // Only show error if a file was selected but wasn't PDF
-          alert('Please select a PDF file.');
-      }
-    }
+    // ... removed ...
   };
+  */
 
-  // Update the upload handler to call the worker
-  const handleUpload = async () => { // Make the function async
+  // Modify the upload handler
+  const handleUpload = async () => {
+    // Remove check for selectedFile
+    /*
     if (!selectedFile) {
       alert("Please select a PDF file first!");
       return;
     }
+    */
 
     setIsProcessing(true);
     // Remove setExtractedData
@@ -61,29 +50,29 @@ function App() {
       console.log('Frontend: Sending request to /extract...');
       // The endpoint is relative because we use Pages Functions.
       // It corresponds to /functions/extract.js
+      // Send POST request without a body
       response = await fetch('/extract', {
         method: 'POST',
-        body: formData,
+        // No body needed as the worker uses a static prompt now
+        // headers: { 'Content-Type': 'application/json' } // Optional: Can set header if needed, but worker ignores body
       });
 
       console.log(`Frontend: Received response status: ${response.status} ${response.statusText}`);
 
-      // --- START NEW DEBUGGING ---
       // Get raw text first to see what was actually returned
       rawResponseText = await response.text();
-      console.log('Frontend: Received raw response text:', rawResponseText);
-      // --- END NEW DEBUGGING ---
+      console.log('Frontend: Received raw response text from worker:', rawResponseText);
 
       // Now, try to parse the raw text as JSON
       let result;
       try {
           if (!rawResponseText) {
-              throw new Error("Response body is empty.");
+              throw new Error("Response body from worker is empty.");
           }
           result = JSON.parse(rawResponseText); // Parse the text we already fetched
-          console.log('Frontend: Successfully parsed JSON:', result);
+          console.log('Frontend: Successfully parsed JSON from worker:', result);
       } catch (jsonError) {
-          console.error('Frontend: Failed to parse response text as JSON:', jsonError);
+          console.error('Frontend: Failed to parse response text from worker as JSON:', jsonError);
           // Throw a more informative error including the raw text
           throw new Error(`Failed to parse JSON response from worker. Status: ${response.status}. Raw text: ${rawResponseText}`);
       }
@@ -121,7 +110,7 @@ function App() {
     } catch (error) {
       console.error('Frontend: Error during fetch or processing:', error);
       // Ensure error message is set, potentially including raw text if available and not already in message
-      let finalErrorMessage = `Failed to process PDF: ${error.message}`;
+      let finalErrorMessage = `Failed to process request: ${error.message}`; // Update error message context
       if (rawResponseText && !error.message.includes(rawResponseText)) {
           // Append raw text if it wasn't part of the JSON parse error message
           // finalErrorMessage += ` (Raw Response: ${rawResponseText})`;
@@ -131,7 +120,7 @@ function App() {
       // Remove setExtractedData
       // setExtractedData(null); // Clear data on error
       // Debug info might already be set from the try block's initial parsing
-      // Ensure raw response debug state is set even on error
+      // Ensure raw response debug state is set even on error if available
       if (rawResponseText && !debugRawResponse) {
           // Attempt to parse worker response JSON even on error to get debug fields
           try {
@@ -185,9 +174,8 @@ function App() {
         {/* Modify results/errors section to include debug info */}
         <section className="results-section">
           <h2>Processing Details</h2>
-          {/* Show loading indicator */}
           {isProcessing && (
-            <p>Analyzing PDF with AI, please wait...</p>
+            <p>Sending request and waiting for LLM response...</p> // Update loading text
           )}
           {/* Show error message */}
           {processingError && (
@@ -227,7 +215,7 @@ function App() {
 
           {/* Adjust placeholder text */}
           {!isProcessing && !processingError && !debugPrompt && !debugRawResponse && (
-            <p>Upload a PDF receipt and click "Process Receipt" to see the prompt sent and raw response received from the LLM.</p>
+            <p>Click the "Send Test Prompt" button to see the prompt sent and raw response received from the LLM.</p>
           )}
         </section>
 
