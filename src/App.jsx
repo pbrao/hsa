@@ -23,118 +23,97 @@ function App() {
 
   // Modify the upload handler
   const handleUpload = async () => {
-    // Remove check for selectedFile
-    /*
-    if (!selectedFile) {
-      alert("Please select a PDF file first!");
-      return;
-    }
-    */
+    console.log('[handleUpload] Function started.'); // Step 1
 
+    console.log('[handleUpload] Setting processing state to true...'); // Step 2
     setIsProcessing(true);
-    // Remove setExtractedData
-    // setExtractedData(null);
     setProcessingError('');
-    // Clear debug info before new request
     setDebugPrompt('');
     setDebugRawResponse('');
+    console.log('[handleUpload] State cleared and isProcessing set.'); // Step 3
 
-    const formData = new FormData();
-    // Key must match the key expected by the worker: 'pdfFile'
-    formData.append('pdfFile', selectedFile);
-
-    let response; // Define response outside try block to access in finally
-    let rawResponseText = ''; // Variable to store raw text
+    let response;
+    let rawResponseText = '';
 
     try {
-      console.log('Frontend: Sending request to /extract...');
-      // The endpoint is relative because we use Pages Functions.
-      // It corresponds to /functions/extract.js
-      // Send POST request without a body
+      console.log('[handleUpload] Entering try block. Preparing fetch...'); // Step 4
+      console.log('[handleUpload] Sending POST request to /extract...'); // Step 5
       response = await fetch('/extract', {
         method: 'POST',
-        // No body needed as the worker uses a static prompt now
-        // headers: { 'Content-Type': 'application/json' } // Optional: Can set header if needed, but worker ignores body
       });
+      console.log('[handleUpload] Fetch call completed.'); // Step 6
 
-      console.log(`Frontend: Received response status: ${response.status} ${response.statusText}`);
+      console.log(`[handleUpload] Received response status: ${response.status} ${response.statusText}`); // Step 7
 
-      // Get raw text first to see what was actually returned
+      console.log('[handleUpload] Attempting to read response text...'); // Step 8
       rawResponseText = await response.text();
-      console.log('Frontend: Received raw response text from worker:', rawResponseText);
+      console.log('[handleUpload] Received raw response text from worker:', rawResponseText); // Step 9
 
-      // Now, try to parse the raw text as JSON
       let result;
+      console.log('[handleUpload] Attempting to parse worker response text as JSON...'); // Step 10
       try {
           if (!rawResponseText) {
+              console.warn('[handleUpload] Worker response body is empty.'); // Step 11a (Warning)
               throw new Error("Response body from worker is empty.");
           }
-          result = JSON.parse(rawResponseText); // Parse the text we already fetched
-          console.log('Frontend: Successfully parsed JSON from worker:', result);
+          result = JSON.parse(rawResponseText);
+          console.log('[handleUpload] Successfully parsed JSON from worker:', result); // Step 11b (Success)
       } catch (jsonError) {
-          console.error('Frontend: Failed to parse response text from worker as JSON:', jsonError);
-          // Throw a more informative error including the raw text
+          console.error('[handleUpload] Failed to parse response text from worker as JSON:', jsonError); // Step 11c (Error)
           throw new Error(`Failed to parse JSON response from worker. Status: ${response.status}. Raw text: ${rawResponseText}`);
       }
 
-
-      // Store debug info regardless of response.ok, if available from parsed JSON
+      console.log('[handleUpload] Checking for debug info in parsed worker response...'); // Step 12
       if (result?.debug_prompt) {
         setDebugPrompt(result.debug_prompt);
+        console.log('[handleUpload] Set debugPrompt state.'); // Step 12a
       }
-      // Use the raw text for debug_raw_response if parsing failed but text exists,
-      // otherwise use the parsed value if available.
       setDebugRawResponse(result?.debug_raw_response || rawResponseText);
+      console.log('[handleUpload] Set debugRawResponse state.'); // Step 12b
 
 
+      console.log(`[handleUpload] Checking if response status is OK (status: ${response.status})...`); // Step 13
       if (!response.ok) {
-        // We already parsed 'result', use it for error details
+        console.error('[handleUpload] Response status is NOT OK.'); // Step 14a (Error Path)
         const errorMessage = result?.error || `Request failed with status ${response.status}`;
         const errorDetails = result?.details ? ` Details: ${result.details}` : '';
+        console.error(`[handleUpload] Throwing error: ${errorMessage}${errorDetails}`); // Step 14b (Error Path)
         throw new Error(`${errorMessage}${errorDetails}`);
       }
 
-      // --- Remove extracted_data logic ---
-      /*
-      // Success! Store the extracted data (now nested)
-      if (result?.extracted_data) {
-          setExtractedData(result.extracted_data);
-      } else {
-          // Handle case where response is ok, but data structure is wrong
-          throw new Error("Received success status, but extracted data is missing in the response.");
-      }
-      */
-      console.log("Frontend: Request successful, displaying debug info.");
+      // If response.ok is true:
+      console.log('[handleUpload] Response status is OK.'); // Step 15 (Success Path)
+      console.log("[handleUpload] Request successful, displaying debug info."); // Step 16 (Success Path)
 
 
     } catch (error) {
-      console.error('Frontend: Error during fetch or processing:', error);
-      // Ensure error message is set, potentially including raw text if available and not already in message
-      let finalErrorMessage = `Failed to process request: ${error.message}`; // Update error message context
-      if (rawResponseText && !error.message.includes(rawResponseText)) {
-          // Append raw text if it wasn't part of the JSON parse error message
-          // finalErrorMessage += ` (Raw Response: ${rawResponseText})`;
-          // Raw response is now displayed separately, so maybe don't append here.
-      }
-       setProcessingError(finalErrorMessage);
-      // Remove setExtractedData
-      // setExtractedData(null); // Clear data on error
-      // Debug info might already be set from the try block's initial parsing
+      console.error('[handleUpload] Caught error in main try block:', error); // Step 17 (Catch Block)
+      let finalErrorMessage = `Failed to process request: ${error.message}`;
+      setProcessingError(finalErrorMessage);
+      console.log('[handleUpload] Set processingError state.'); // Step 17a (Catch Block)
+
       // Ensure raw response debug state is set even on error if available
       if (rawResponseText && !debugRawResponse) {
-          // Attempt to parse worker response JSON even on error to get debug fields
+          console.log('[handleUpload] Attempting to set debug info from raw text during error handling...'); // Step 17b (Catch Block)
           try {
               const errorResult = JSON.parse(rawResponseText);
-              if (errorResult?.debug_prompt) setDebugPrompt(errorResult.debug_prompt);
-              if (errorResult?.debug_raw_response) setDebugRawResponse(errorResult.debug_raw_response);
+              if (errorResult?.debug_prompt) {
+                  setDebugPrompt(errorResult.debug_prompt);
+                  console.log('[handleUpload] Set debugPrompt state during error handling.'); // Step 17c (Catch Block)
+              }
+              if (errorResult?.debug_raw_response) {
+                  setDebugRawResponse(errorResult.debug_raw_response);
+                  console.log('[handleUpload] Set debugRawResponse state during error handling.'); // Step 17d (Catch Block)
+              }
           } catch (e) {
-              // If parsing fails, just set the raw text as the debug response
+              console.warn('[handleUpload] Could not parse raw text for debug info during error handling. Setting raw text directly.'); // Step 17e (Catch Block)
               setDebugRawResponse(rawResponseText);
           }
       }
-
     } finally {
+      console.log('[handleUpload] Entering finally block.'); // Step 18
       setIsProcessing(false);
+      console.log('[handleUpload] Set isProcessing state to false. Function finished.'); // Step 19
     }
   };
 
