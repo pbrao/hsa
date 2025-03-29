@@ -5,8 +5,8 @@ import React, { useState } from 'react';
 
 function App() {
   const [selectedFile, setSelectedFile] = useState(null);
-  // Add state for worker interaction
-  const [extractedData, setExtractedData] = useState(null);
+  // Remove extractedData state
+  // const [extractedData, setExtractedData] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingError, setProcessingError] = useState('');
   // Add state for debug info
@@ -17,7 +17,8 @@ function App() {
     const file = event.target.files[0];
     // Reset state when a new file is selected or selection is cleared
     setSelectedFile(null);
-    setExtractedData(null);
+    // Remove setExtractedData
+    // setExtractedData(null);
     setProcessingError('');
     // Clear debug info as well
     setDebugPrompt('');
@@ -42,7 +43,8 @@ function App() {
     }
 
     setIsProcessing(true);
-    setExtractedData(null);
+    // Remove setExtractedData
+    // setExtractedData(null);
     setProcessingError('');
     // Clear debug info before new request
     setDebugPrompt('');
@@ -103,6 +105,8 @@ function App() {
         throw new Error(`${errorMessage}${errorDetails}`);
       }
 
+      // --- Remove extracted_data logic ---
+      /*
       // Success! Store the extracted data (now nested)
       if (result?.extracted_data) {
           setExtractedData(result.extracted_data);
@@ -110,6 +114,8 @@ function App() {
           // Handle case where response is ok, but data structure is wrong
           throw new Error("Received success status, but extracted data is missing in the response.");
       }
+      */
+      console.log("Frontend: Request successful, displaying debug info.");
 
 
     } catch (error) {
@@ -122,11 +128,20 @@ function App() {
           // Raw response is now displayed separately, so maybe don't append here.
       }
        setProcessingError(finalErrorMessage);
-      setExtractedData(null); // Clear data on error
+      // Remove setExtractedData
+      // setExtractedData(null); // Clear data on error
       // Debug info might already be set from the try block's initial parsing
       // Ensure raw response debug state is set even on error
       if (rawResponseText && !debugRawResponse) {
-          setDebugRawResponse(rawResponseText);
+          // Attempt to parse worker response JSON even on error to get debug fields
+          try {
+              const errorResult = JSON.parse(rawResponseText);
+              if (errorResult?.debug_prompt) setDebugPrompt(errorResult.debug_prompt);
+              if (errorResult?.debug_raw_response) setDebugRawResponse(errorResult.debug_raw_response);
+          } catch (e) {
+              // If parsing fails, just set the raw text as the debug response
+              setDebugRawResponse(rawResponseText);
+          }
       }
 
     } finally {
@@ -181,7 +196,8 @@ function App() {
             </div>
           )}
 
-          {/* Show extracted data */}
+          {/* --- Remove Extracted Data Section --- */}
+          {/*
           {extractedData && !isProcessing && (
             <div className="extracted-data-box">
               <h3>Successfully Extracted Data:</h3>
@@ -190,6 +206,7 @@ function App() {
               </pre>
             </div>
           )}
+          */}
 
           {/* Show Debug Prompt */}
           {debugPrompt && (
@@ -208,9 +225,9 @@ function App() {
           )}
 
 
-          {/* Show initial placeholder text */}
-          {!isProcessing && !processingError && !extractedData && !debugPrompt && !debugRawResponse && (
-            <p>Upload a PDF receipt and click "Process Receipt" to see results and debug information here.</p>
+          {/* Adjust placeholder text */}
+          {!isProcessing && !processingError && !debugPrompt && !debugRawResponse && (
+            <p>Upload a PDF receipt and click "Process Receipt" to see the prompt sent and raw response received from the LLM.</p>
           )}
         </section>
 

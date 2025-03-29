@@ -255,16 +255,16 @@ button:focus-visible {
 }
 
 
-/* Box containing extracted data */
+/* Remove or comment out these rules */
+/*
 .extracted-data-box {
-    margin-bottom: 1rem; /* Space below data */
+    margin-bottom: 1rem;
 }
 
-/* Style for the <pre> tag holding the extracted JSON */
 .extracted-json-display {
   white-space: pre-wrap;
   word-wrap: break-word;
-  background-color: rgba(0, 0, 0, 0.15); /* Slightly darker background */
+  background-color: rgba(0, 0, 0, 0.15);
   padding: 1rem;
   border-radius: 4px;
   max-height: 400px;
@@ -274,6 +274,7 @@ button:focus-visible {
   color: inherit;
   text-align: left;
 }
+*/
 
 /* Box containing debug info */
 .debug-info-box {

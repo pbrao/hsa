@@ -69,30 +69,13 @@ app.post('/', async (c) => {
         }, 500);
     }
 
-    // Attempt to parse the raw text as JSON to extract the actual reply if structured
-    let extractedText = '';
-    try {
-        const geminiResult = JSON.parse(rawGeminiText);
-        if (geminiResult.candidates?.[0]?.content?.parts?.[0]?.text) {
-            extractedText = geminiResult.candidates[0].content.parts[0].text;
-            console.log("Worker: Extracted text content from Gemini JSON:", extractedText);
-        } else {
-            console.warn("Worker: Could not find text in expected Gemini JSON structure. Using raw response.");
-            extractedText = rawGeminiText; // Fallback to raw text
-        }
-    } catch (parseError) {
-        console.warn("Worker: Gemini response was not JSON. Using raw text. Error:", parseError);
-        extractedText = rawGeminiText; // Use raw text if not JSON
-    }
-
-
-    // --- Return Debug Info ---
-    console.log("Worker: Returning 200 with debug info.");
+    // --- Return Debug Info (using raw text directly) ---
+    console.log("Worker: Returning 200 with debug info (raw LLM response).");
     return c.json({
         // No 'extracted_data' in this simplified version
         debug_prompt: prompt,
-        // Return the most relevant text we got (parsed content or raw)
-        debug_raw_response: extractedText
+        // Directly return the raw text received from Gemini
+        debug_raw_response: rawGeminiText
       }, 200);
 
   } catch (error) {
