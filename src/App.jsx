@@ -52,28 +52,54 @@ function App() {
     // Key must match the key expected by the worker: 'pdfFile'
     formData.append('pdfFile', selectedFile);
 
+    let response; // Define response outside try block to access in finally
+    let rawResponseText = ''; // Variable to store raw text
+
     try {
+      console.log('Frontend: Sending request to /extract...');
       // The endpoint is relative because we use Pages Functions.
       // It corresponds to /functions/extract.js
-      const response = await fetch('/extract', {
+      response = await fetch('/extract', {
         method: 'POST',
         body: formData,
       });
 
-      const result = await response.json(); // Always try to parse JSON
+      console.log(`Frontend: Received response status: ${response.status} ${response.statusText}`);
 
-      // Store debug info regardless of response.ok, if available
+      // --- START NEW DEBUGGING ---
+      // Get raw text first to see what was actually returned
+      rawResponseText = await response.text();
+      console.log('Frontend: Received raw response text:', rawResponseText);
+      // --- END NEW DEBUGGING ---
+
+      // Now, try to parse the raw text as JSON
+      let result;
+      try {
+          if (!rawResponseText) {
+              throw new Error("Response body is empty.");
+          }
+          result = JSON.parse(rawResponseText); // Parse the text we already fetched
+          console.log('Frontend: Successfully parsed JSON:', result);
+      } catch (jsonError) {
+          console.error('Frontend: Failed to parse response text as JSON:', jsonError);
+          // Throw a more informative error including the raw text
+          throw new Error(`Failed to parse JSON response from worker. Status: ${response.status}. Raw text: ${rawResponseText}`);
+      }
+
+
+      // Store debug info regardless of response.ok, if available from parsed JSON
       if (result?.debug_prompt) {
         setDebugPrompt(result.debug_prompt);
       }
-      if (result?.debug_raw_response) {
-        setDebugRawResponse(result.debug_raw_response);
-      }
+      // Use the raw text for debug_raw_response if parsing failed but text exists,
+      // otherwise use the parsed value if available.
+      setDebugRawResponse(result?.debug_raw_response || rawResponseText);
+
 
       if (!response.ok) {
+        // We already parsed 'result', use it for error details
         const errorMessage = result?.error || `Request failed with status ${response.status}`;
         const errorDetails = result?.details ? ` Details: ${result.details}` : '';
-        // Raw response is now handled by the state variable above
         throw new Error(`${errorMessage}${errorDetails}`);
       }
 
@@ -87,10 +113,22 @@ function App() {
 
 
     } catch (error) {
-      console.error('Error processing file:', error);
-      setProcessingError(`Failed to process PDF: ${error.message}`);
+      console.error('Frontend: Error during fetch or processing:', error);
+      // Ensure error message is set, potentially including raw text if available and not already in message
+      let finalErrorMessage = `Failed to process PDF: ${error.message}`;
+      if (rawResponseText && !error.message.includes(rawResponseText)) {
+          // Append raw text if it wasn't part of the JSON parse error message
+          // finalErrorMessage += ` (Raw Response: ${rawResponseText})`;
+          // Raw response is now displayed separately, so maybe don't append here.
+      }
+       setProcessingError(finalErrorMessage);
       setExtractedData(null); // Clear data on error
       // Debug info might already be set from the try block's initial parsing
+      // Ensure raw response debug state is set even on error
+      if (rawResponseText && !debugRawResponse) {
+          setDebugRawResponse(rawResponseText);
+      }
+
     } finally {
       setIsProcessing(false);
     }
