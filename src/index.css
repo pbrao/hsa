@@ -227,6 +227,78 @@ button:focus-visible {
   text-align: left;            /* Ensure text aligns left */
 }
 
+/* Style for sub-headings within results */
+.results-section h3 {
+    margin-top: 1.5rem; /* Add space above sub-headings */
+    margin-bottom: 0.5rem;
+    font-size: 1.1em;
+    color: rgba(255, 255, 255, 0.9);
+}
+.results-section h3:first-of-type {
+    margin-top: 0; /* No top margin for the very first sub-heading */
+}
+
+
+/* Style for the error box */
+.error-box {
+  color: #ffdddd; /* Lighter red text for dark mode */
+  border: 1px solid rgba(255, 100, 100, 0.5);
+  padding: 10px;
+  border-radius: 4px;
+  background-color: rgba(255, 0, 0, 0.15);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin-bottom: 1rem; /* Space below error */
+}
+.error-box strong {
+    color: #ffcccc; /* Slightly brighter for the "Error:" text */
+}
+
+
+/* Box containing extracted data */
+.extracted-data-box {
+    margin-bottom: 1rem; /* Space below data */
+}
+
+/* Style for the <pre> tag holding the extracted JSON */
+.extracted-json-display {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  background-color: rgba(0, 0, 0, 0.15); /* Slightly darker background */
+  padding: 1rem;
+  border-radius: 4px;
+  max-height: 400px;
+  overflow-y: auto;
+  font-family: monospace;
+  font-size: 0.9em;
+  color: inherit;
+  text-align: left;
+}
+
+/* Box containing debug info */
+.debug-info-box {
+    margin-top: 1.5rem; /* Space above debug sections */
+    border-top: 1px dashed rgba(255, 255, 255, 0.3); /* Separator */
+    padding-top: 1rem;
+}
+
+/* Style for the <pre> tags holding debug info */
+.debug-prompt-display,
+.debug-raw-response-display {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  background-color: rgba(0, 0, 0, 0.1); /* Slightly lighter debug background */
+  padding: 1rem;
+  border-radius: 4px;
+  max-height: 300px; /* Slightly smaller max height for debug */
+  overflow-y: auto;
+  font-family: monospace;
+  font-size: 0.85em; /* Slightly smaller font for debug */
+  color: rgba(255, 255, 255, 0.8); /* Slightly dimmer text for debug */
+  text-align: left;
+}
+
+
 /* Style for disabled button */
 button:disabled {
   opacity: 0.6;
@@ -249,5 +321,22 @@ button:disabled {
       background-color: rgba(255, 0, 0, 0.05) !important; /* Override inline style slightly */
       border-color: rgba(255, 0, 0, 0.3) !important;
       color: #cc0000 !important;
+  }
+   .error-box strong {
+       color: #b30000 !important;
+   }
+
+  .extracted-json-display {
+     background-color: rgba(0, 0, 0, 0.05);
+  }
+
+  .debug-info-box {
+      border-top: 1px dashed rgba(0, 0, 0, 0.2);
+  }
+
+  .debug-prompt-display,
+  .debug-raw-response-display {
+     background-color: rgba(0, 0, 0, 0.03);
+     color: rgba(0, 0, 0, 0.7);
   }
 }

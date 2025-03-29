@@ -102,7 +102,12 @@ app.post('/', async (c) => {
         extractedText = geminiResult.candidates[0].content.parts[0].text;
     } else {
         console.error("Unexpected Gemini response structure:", JSON.stringify(geminiResult, null, 2));
-        return c.json({ error: 'Failed to parse response from LLM.', details: "Unexpected response structure." }, 500);
+        // Include prompt in this error response too
+        return c.json({
+             error: 'Failed to parse response from LLM.',
+             details: "Unexpected response structure.",
+             debug_prompt: prompt // Add prompt here
+            }, 500);
     }
 
     // Attempt to parse the extracted text as JSON
@@ -118,11 +123,22 @@ app.post('/', async (c) => {
           // return c.json({ error: 'LLM response JSON missing expected keys.', raw_response: cleanJsonString }, 500);
       }
 
-      return c.json(jsonData, 200); // Return the extracted JSON
+      // Modify the successful response to include debug info
+      return c.json({
+          extracted_data: jsonData, // Nest the actual data
+          debug_prompt: prompt,
+          debug_raw_response: cleanJsonString // Return the cleaned text before parsing
+        }, 200);
+
     } catch (parseError) {
       console.error("Failed to parse LLM response as JSON:", parseError);
       console.error("Raw LLM Text:", extractedText);
-      return c.json({ error: 'LLM response was not valid JSON.', raw_response: extractedText }, 500);
+      // Modify the JSON parse error response to include debug info
+      return c.json({
+          error: 'LLM response was not valid JSON.',
+          debug_prompt: prompt, // Add prompt here
+          debug_raw_response: extractedText // Return the raw text received
+        }, 500);
     }
 
   } catch (error) {

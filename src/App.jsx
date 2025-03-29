@@ -9,13 +9,19 @@ function App() {
   const [extractedData, setExtractedData] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingError, setProcessingError] = useState('');
+  // Add state for debug info
+  const [debugPrompt, setDebugPrompt] = useState('');
+  const [debugRawResponse, setDebugRawResponse] = useState('');
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
     // Reset state when a new file is selected or selection is cleared
     setSelectedFile(null);
-    setExtractedData(null); // Clear previous results
-    setProcessingError(''); // Clear previous errors
+    setExtractedData(null);
+    setProcessingError('');
+    // Clear debug info as well
+    setDebugPrompt('');
+    setDebugRawResponse('');
 
     if (file && file.type === 'application/pdf') {
       setSelectedFile(file);
@@ -35,9 +41,12 @@ function App() {
       return;
     }
 
-    setIsProcessing(true); // Set loading state
-    setExtractedData(null); // Clear previous results
-    setProcessingError(''); // Clear previous errors
+    setIsProcessing(true);
+    setExtractedData(null);
+    setProcessingError('');
+    // Clear debug info before new request
+    setDebugPrompt('');
+    setDebugRawResponse('');
 
     const formData = new FormData();
     // Key must match the key expected by the worker: 'pdfFile'
@@ -53,25 +62,37 @@ function App() {
 
       const result = await response.json(); // Always try to parse JSON
 
-      if (!response.ok) {
-        // Use error message from worker response if available, otherwise provide a default
-        const errorMessage = result?.error || `Request failed with status ${response.status}`;
-        const errorDetails = result?.details ? ` Details: ${result.details}` : '';
-         // If the worker sent back raw LLM text on JSON parse failure, include it
-        const rawResponse = result?.raw_response ? ` Raw LLM Response: ${result.raw_response}` : '';
-        throw new Error(`${errorMessage}${errorDetails}${rawResponse}`);
+      // Store debug info regardless of response.ok, if available
+      if (result?.debug_prompt) {
+        setDebugPrompt(result.debug_prompt);
+      }
+      if (result?.debug_raw_response) {
+        setDebugRawResponse(result.debug_raw_response);
       }
 
-      // Success! Store the extracted data
-      setExtractedData(result);
+      if (!response.ok) {
+        const errorMessage = result?.error || `Request failed with status ${response.status}`;
+        const errorDetails = result?.details ? ` Details: ${result.details}` : '';
+        // Raw response is now handled by the state variable above
+        throw new Error(`${errorMessage}${errorDetails}`);
+      }
+
+      // Success! Store the extracted data (now nested)
+      if (result?.extracted_data) {
+          setExtractedData(result.extracted_data);
+      } else {
+          // Handle case where response is ok, but data structure is wrong
+          throw new Error("Received success status, but extracted data is missing in the response.");
+      }
+
 
     } catch (error) {
       console.error('Error processing file:', error);
-      // Display a user-friendly message, potentially logging the full error
       setProcessingError(`Failed to process PDF: ${error.message}`);
       setExtractedData(null); // Clear data on error
+      // Debug info might already be set from the try block's initial parsing
     } finally {
-      setIsProcessing(false); // Reset loading state regardless of outcome
+      setIsProcessing(false);
     }
   };
 
@@ -108,32 +129,50 @@ function App() {
           </button>
         </section>
 
-        {/* Add section for results/errors */}
+        {/* Modify results/errors section to include debug info */}
         <section className="results-section">
-          <h2>Extracted Information</h2>
+          <h2>Processing Details</h2>
           {/* Show loading indicator */}
           {isProcessing && (
             <p>Analyzing PDF with AI, please wait...</p>
           )}
           {/* Show error message */}
           {processingError && (
-            <div style={{ color: 'red', border: '1px solid red', padding: '10px', borderRadius: '4px', backgroundColor: 'rgba(255,0,0,0.1)', whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
+            <div className="error-box">
               <strong>Error:</strong> {processingError}
             </div>
           )}
+
           {/* Show extracted data */}
           {extractedData && !isProcessing && (
-            <div>
-              <p>Successfully extracted data:</p>
-              {/* Display JSON nicely formatted */}
+            <div className="extracted-data-box">
+              <h3>Successfully Extracted Data:</h3>
               <pre className="extracted-json-display">
                 {JSON.stringify(extractedData, null, 2)}
               </pre>
             </div>
           )}
+
+          {/* Show Debug Prompt */}
+          {debugPrompt && (
+            <div className="debug-info-box">
+                <h3>Debug: Prompt Sent to LLM</h3>
+                <pre className="debug-prompt-display">{debugPrompt}</pre>
+            </div>
+          )}
+
+          {/* Show Debug Raw Response */}
+          {debugRawResponse && (
+             <div className="debug-info-box">
+                <h3>Debug: Raw Response from LLM</h3>
+                <pre className="debug-raw-response-display">{debugRawResponse}</pre>
+             </div>
+          )}
+
+
           {/* Show initial placeholder text */}
-          {!isProcessing && !processingError && !extractedData && (
-            <p>Upload a PDF receipt and click "Process Receipt" to see results here.</p>
+          {!isProcessing && !processingError && !extractedData && !debugPrompt && !debugRawResponse && (
+            <p>Upload a PDF receipt and click "Process Receipt" to see results and debug information here.</p>
           )}
         </section>
 
