@@ -103,5 +103,35 @@ function arrayBufferToBase64(buffer) {
   return btoa(binary); // btoa is available in Cloudflare Workers environment
 }
 
-// Export the Hono app for Cloudflare Pages Functions
-export const onRequestPost = app.fetch; // Use specific export for Pages Functions
+// Export the Hono app for Cloudflare Pages Functions with Top-Level Error Catching
+export const onRequestPost = async (context) => {
+  try {
+    // Delegate the request to the Hono application
+    // context includes: request, env, params, waitUntil, next, data
+    return await app.fetch(context.request, context.env, context);
+  } catch (err) {
+    // This catches errors thrown BEFORE or DURING Hono's processing
+    // (e.g., middleware errors, routing errors, or unhandled exceptions in app.fetch)
+    console.error("Worker: Top-level unhandled exception caught in onRequestPost:", err);
+
+    // Manually construct a JSON Response object because Hono's context 'c' might not be available
+    const errorResponse = {
+      error: "Worker script execution failed unexpectedly.",
+      details: err.message,
+      // Include stack trace for better debugging in Cloudflare logs
+      // Avoid sending stack trace to the client in production for security
+      stack_trace_debug: err.stack // Consider removing/disabling this in production
+    };
+
+    return new Response(JSON.stringify(errorResponse), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        // Add CORS headers manually if needed, as Hono middleware might not have run
+        'Access-Control-Allow-Origin': '*', // IMPORTANT: Restrict this in production
+        'Access-Control-Allow-Methods': 'POST, OPTIONS', // Match allowed methods
+        'Access-Control-Allow-Headers': 'Content-Type', // Match allowed headers
+       }
+    });
+  }
+};
