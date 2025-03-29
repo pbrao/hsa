@@ -145,29 +145,22 @@ function App() {
          <h1>HSA Receipt Tracker</h1>
       </header>
       <main className="app-main">
+        {/* Modify upload section */}
         <section className="upload-section">
-          <h2>Upload Your PDF Receipt</h2>
-          <input
-            id="file-upload"
-            type="file"
-            accept="application/pdf"
-            onChange={handleFileChange}
-            className="file-input"
-            aria-label="PDF upload input"
-            // Disable input while processing
-            disabled={isProcessing}
-          />
-          {selectedFile && (
-             <p>Selected: {selectedFile.name}</p>
-          )}
+          <h2>Trigger LLM Test</h2>
+          {/* Remove file input and selected file display */}
+          {/*
+          <input ... />
+          {selectedFile && ( <p>...</p> )}
+          */}
+          <p>Click the button to send a static prompt ("hello, how are you?") to the LLM via the Cloudflare Worker.</p>
           <button
              onClick={handleUpload}
-             // Disable button if no file or if processing
-             disabled={!selectedFile || isProcessing}
+             // Only disable when processing
+             disabled={isProcessing}
              style={{ marginTop: '1rem' }}
           >
-            {/* Change button text based on state */}
-            {isProcessing ? 'Processing...' : 'Process Receipt'}
+            {isProcessing ? 'Sending...' : 'Send Test Prompt'}
           </button>
         </section>
 
