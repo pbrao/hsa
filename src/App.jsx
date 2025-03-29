@@ -1,67 +1,84 @@
 
-// Remove useState if no longer needed, or keep if selectedFile state is used elsewhere
-import React, { useState } from 'react';
-// Remove pdfjs-dist import and worker config
-// import * as pdfjsLib from 'pdfjs-dist';
-// pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.js', import.meta.url).toString();
 
+import React, { useState } from 'react';
+// No other imports needed for this change
 
 function App() {
-  // Keep selectedFile state, remove others
   const [selectedFile, setSelectedFile] = useState(null);
-  // Remove pdfText, isLoading, error states
-  // const [pdfText, setPdfText] = useState('');
-  // const [isLoading, setIsLoading] = useState(false);
-  // const [error, setError] = useState('');
+  // Add state for worker interaction
+  const [extractedData, setExtractedData] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingError, setProcessingError] = useState('');
 
-  // Simplify the file change handler
   const handleFileChange = (event) => {
     const file = event.target.files[0];
+    // Reset state when a new file is selected or selection is cleared
+    setSelectedFile(null);
+    setExtractedData(null); // Clear previous results
+    setProcessingError(''); // Clear previous errors
+
     if (file && file.type === 'application/pdf') {
       setSelectedFile(file);
       console.log("PDF file selected:", file.name);
-      // Placeholder: Ready to send 'file' to a backend for processing into JSON
     } else {
-      setSelectedFile(null);
+      setSelectedFile(null); // Ensure state is null if not PDF
       if (file) { // Only show error if a file was selected but wasn't PDF
           alert('Please select a PDF file.');
       }
     }
   };
 
-  // Add back a placeholder upload handler
-  const handleUpload = () => {
+  // Update the upload handler to call the worker
+  const handleUpload = async () => { // Make the function async
     if (!selectedFile) {
       alert("Please select a PDF file first!");
       return;
     }
-    // --- Placeholder for sending the file to a backend API ---
-    console.log("Initiating upload/processing for:", selectedFile.name);
-    alert(`Placeholder: Would now send ${selectedFile.name} to backend for JSON extraction.`);
-    // Example using FormData (how you might structure the request)
-    // const formData = new FormData();
-    // formData.append('pdfFile', selectedFile);
-    // fetch('/api/extract-pdf', { // Replace with your actual API endpoint
-    //   method: 'POST',
-    //   body: formData,
-    // })
-    // .then(response => response.json())
-    // .then(data => {
-    //   console.log('Processing result (JSON):', data);
-    //   // Handle the JSON data from the backend
-    // })
-    // .catch(error => {
-    //   console.error('Error uploading/processing file:', error);
-    //   alert('Failed to process PDF.');
-    // });
-    // --- End Placeholder ---
+
+    setIsProcessing(true); // Set loading state
+    setExtractedData(null); // Clear previous results
+    setProcessingError(''); // Clear previous errors
+
+    const formData = new FormData();
+    // Key must match the key expected by the worker: 'pdfFile'
+    formData.append('pdfFile', selectedFile);
+
+    try {
+      // The endpoint is relative because we use Pages Functions.
+      // It corresponds to /functions/extract.js
+      const response = await fetch('/extract', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json(); // Always try to parse JSON
+
+      if (!response.ok) {
+        // Use error message from worker response if available, otherwise provide a default
+        const errorMessage = result?.error || `Request failed with status ${response.status}`;
+        const errorDetails = result?.details ? ` Details: ${result.details}` : '';
+         // If the worker sent back raw LLM text on JSON parse failure, include it
+        const rawResponse = result?.raw_response ? ` Raw LLM Response: ${result.raw_response}` : '';
+        throw new Error(`${errorMessage}${errorDetails}${rawResponse}`);
+      }
+
+      // Success! Store the extracted data
+      setExtractedData(result);
+
+    } catch (error) {
+      console.error('Error processing file:', error);
+      // Display a user-friendly message, potentially logging the full error
+      setProcessingError(`Failed to process PDF: ${error.message}`);
+      setExtractedData(null); // Clear data on error
+    } finally {
+      setIsProcessing(false); // Reset loading state regardless of outcome
+    }
   };
 
 
   return (
     <div className="app-container">
       <header className="app-header">
-         {/* Ensure the H1 is present if it was accidentally removed */}
          <h1>HSA Receipt Tracker</h1>
       </header>
       <main className="app-main">
@@ -70,37 +87,56 @@ function App() {
           <input
             id="file-upload"
             type="file"
-            accept="application/pdf" // Accept only PDF files
+            accept="application/pdf"
             onChange={handleFileChange}
-            className="file-input" // Keep class if needed for styling
+            className="file-input"
             aria-label="PDF upload input"
+            // Disable input while processing
+            disabled={isProcessing}
           />
           {selectedFile && (
              <p>Selected: {selectedFile.name}</p>
           )}
-          {/* Add the upload button back */}
           <button
              onClick={handleUpload}
-             disabled={!selectedFile}
+             // Disable button if no file or if processing
+             disabled={!selectedFile || isProcessing}
              style={{ marginTop: '1rem' }}
           >
-            Process Receipt
+            {/* Change button text based on state */}
+            {isProcessing ? 'Processing...' : 'Process Receipt'}
           </button>
         </section>
 
-        {/* Remove the entire pdf-content-section */}
-        {/*
-        {(isLoading || pdfText) && (
-          <section className="pdf-content-section">
-            <h2>Extracted Text</h2>
-            {isLoading ? (
-              <p>Loading and parsing PDF...</p>
-            ) : (
-              <pre className="pdf-text-display">{pdfText}</pre>
-            )}
-          </section>
-        )}
-        */}
+        {/* Add section for results/errors */}
+        <section className="results-section">
+          <h2>Extracted Information</h2>
+          {/* Show loading indicator */}
+          {isProcessing && (
+            <p>Analyzing PDF with AI, please wait...</p>
+          )}
+          {/* Show error message */}
+          {processingError && (
+            <div style={{ color: 'red', border: '1px solid red', padding: '10px', borderRadius: '4px', backgroundColor: 'rgba(255,0,0,0.1)', whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
+              <strong>Error:</strong> {processingError}
+            </div>
+          )}
+          {/* Show extracted data */}
+          {extractedData && !isProcessing && (
+            <div>
+              <p>Successfully extracted data:</p>
+              {/* Display JSON nicely formatted */}
+              <pre className="extracted-json-display">
+                {JSON.stringify(extractedData, null, 2)}
+              </pre>
+            </div>
+          )}
+          {/* Show initial placeholder text */}
+          {!isProcessing && !processingError && !extractedData && (
+            <p>Upload a PDF receipt and click "Process Receipt" to see results here.</p>
+          )}
+        </section>
+
       </main>
       <footer className="app-footer">
         <p>&copy; {new Date().getFullYear()} Your Company</p>
