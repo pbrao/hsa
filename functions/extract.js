@@ -17,19 +17,81 @@ export const onRequestPost = async (context) => {
     });
   }
   const geminiApiKey = context.env.GEMINI_API_KEY;
-  const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-exp-03-25:generateContent?key=${geminiApiKey}`;
+  // Ensure you are using a model that supports PDF input, like 1.5 Pro
+  const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${geminiApiKey}`;
   console.log("Worker: API Key found. Using Gemini URL:", geminiApiUrl);
 
-  const prompt = "hello, how are you?"; // Static prompt for testing
+  // Define the extraction prompt
+  const prompt = `
+    Analyze the content of the provided PDF document, which is an HSA receipt or medical bill.
+    Extract the following information precisely:
+    1. Provider Name: The name of the clinic, hospital, doctor, or pharmacy.
+    2. Date of Service: The specific date the service was rendered or the item was purchased. Format as YYYY-MM-DD if possible, otherwise use the format present. If multiple dates exist, use the primary service date or the latest one shown.
+    3. Cost of Service: The total amount paid or due by the patient for the service/item. Extract only the final numerical value, excluding currency symbols initially.
+
+    Return the extracted information ONLY in a valid JSON object format like this:
+    {
+      "provider_name": "...",
+      "date_of_service": "...",
+      "cost_of_service": "..."
+    }
+    Do not include any explanatory text, markdown formatting (like \`\`\`json), or anything else before or after the JSON object itself.
+    If any piece of information cannot be reasonably determined from the document, use the string "Not Found" as the value for that specific key in the JSON object.
+  `;
 
   try {
-    console.log("Worker: Using static prompt:", prompt);
+    // --- Get File from Request ---
+    console.log("Worker: Attempting to read formData...");
+    const formData = await context.request.formData();
+    const file = formData.get('pdfFile'); // Key must match frontend FormData key
+    console.log("Worker: formData read.");
+
+    if (!file || !(file instanceof File)) {
+      console.error("Worker: No PDF file found in formData.");
+      const errorPayload = { error: 'No PDF file provided in the request.', debug_prompt: prompt };
+      return new Response(JSON.stringify(errorPayload), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      });
+    }
+    if (file.type !== 'application/pdf') {
+        console.error(`Worker: Invalid file type received: ${file.type}`);
+        const errorPayload = { error: 'Invalid file type. Only PDF is accepted.', debug_prompt: prompt };
+        return new Response(JSON.stringify(errorPayload), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        });
+    }
+    console.log(`Worker: Received file: ${file.name}, Type: ${file.type}, Size: ${file.size}`);
+
+    // --- Read File and Convert to Base64 ---
+    console.log("Worker: Reading file ArrayBuffer...");
+    const arrayBuffer = await file.arrayBuffer();
+    console.log("Worker: Converting ArrayBuffer to Base64...");
+    const base64String = arrayBufferToBase64(arrayBuffer);
+    console.log("Worker: Base64 conversion complete."); // Don't log base64 string
 
     // --- Prepare Payload for Gemini ---
     const requestPayload = {
-      contents: [ { parts: [ { text: prompt } ] } ]
+      contents: [
+        {
+          parts: [
+            { text: prompt }, // The detailed prompt
+            {
+              inline_data: { // The PDF data
+                mime_type: 'application/pdf',
+                data: base64String,
+              },
+            },
+          ],
+        },
+      ],
+      // Optional: Add generationConfig if needed, e.g., to encourage JSON output
+      // generationConfig: {
+      //   "response_mime_type": "application/json",
+      // }
     };
-    console.log("Worker: Request payload prepared for Gemini.");
+    console.log("Worker: Request payload prepared for Gemini (including PDF data).");
 
     // --- Call Gemini API ---
     console.log("Worker: Sending request to Gemini API...");
@@ -40,11 +102,10 @@ export const onRequestPost = async (context) => {
     });
     console.log(`Worker: Received response from Gemini API. Status: ${geminiResponse.status}`);
 
-    // --- Process Gemini Response (Focus on Raw Text) ---
-    const rawGeminiText = await geminiResponse.text(); // Get raw text response first
+    // --- Process Gemini Response ---
+    const rawGeminiText = await geminiResponse.text();
     console.log("Worker: Raw text response from Gemini:", rawGeminiText);
 
-    // Prepare response payload (success or error)
     let responsePayload;
     let responseStatus;
 
@@ -54,27 +115,45 @@ export const onRequestPost = async (context) => {
       try {
           const googleError = JSON.parse(rawGeminiText);
           details = googleError?.error?.message || rawGeminiText;
-      } catch(e) { /* Ignore parsing error, use raw text */ }
+      } catch(e) { /* Ignore parsing error, use raw text */ } // Keep error parsing
 
       responseStatus = 500;
       responsePayload = {
           error: `Gemini API request failed: ${geminiResponse.statusText}`,
           details: details,
           debug_prompt: prompt,
-          debug_raw_response: rawGeminiText // Include raw response even on error
+          debug_raw_response: rawGeminiText
       };
       console.log("Worker: Preparing 500 JSON response due to Gemini API error.");
 
     } else {
-      // Success case
-      responseStatus = 200;
-      responsePayload = {
-          // No 'extracted_data' as we removed JSON parsing expectation for LLM response
-          message: "Successfully received response from LLM.", // Add a success message
-          debug_prompt: prompt,
-          debug_raw_response: rawGeminiText // Return the raw text received
-      };
-      console.log("Worker: Preparing 200 JSON response with debug info.");
+      // Attempt to parse the successful response as JSON
+      try {
+        // Clean potential markdown formatting before parsing
+        const cleanJsonString = rawGeminiText.trim().replace(/^```json\s*|```$/g, '');
+        const jsonData = JSON.parse(cleanJsonString);
+        console.log("Worker: Successfully parsed LLM response as JSON.");
+
+        responseStatus = 200;
+        responsePayload = {
+            extracted_data: jsonData, // Nest the parsed data
+            debug_prompt: prompt,
+            debug_raw_response: rawGeminiText // Still include raw for comparison
+        };
+        console.log("Worker: Preparing 200 JSON response with extracted data and debug info.");
+
+      } catch (parseError) {
+        console.error("Worker: Failed to parse successful LLM response as JSON:", parseError);
+        // LLM succeeded but didn't return valid JSON as requested
+        responseStatus = 500; // Treat as server-side issue
+        responsePayload = {
+            error: 'LLM response was not in the expected JSON format.',
+            details: parseError.message,
+            debug_prompt: prompt,
+            debug_raw_response: rawGeminiText // Crucial to see what was returned
+        };
+        console.log("Worker: Preparing 500 JSON response due to LLM JSON parse error.");
+      }
     }
 
     // Return the response
@@ -102,11 +181,21 @@ export const onRequestPost = async (context) => {
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } // Add CORS
     });
   }
+    return new Response(JSON.stringify(errorPayload), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } // Add CORS
+    });
+  }
 };
 
-// Keep the helper function if you plan to reintroduce file uploads later
-/*
+// --- Helper Function ---
+// Uncomment or add this back
 function arrayBufferToBase64(buffer) {
-  // ...
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary); // btoa is available in Cloudflare Workers environment
 }
-*/
