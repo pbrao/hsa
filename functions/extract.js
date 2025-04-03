@@ -166,21 +166,17 @@ export const onRequestPost = async (context) => {
     });
 
   } catch (error) {
-    // This catches errors during the fetch call or response processing
+    // This catches errors during file processing, fetch call, etc.
     console.error('Worker: Unhandled error in onRequestPost logic:', error);
     const errorPayload = {
         error: 'An unexpected error occurred during worker execution.',
         details: error.message,
         stack_trace_debug: error.stack, // For Cloudflare logs
-        debug_prompt: prompt, // Include prompt if available
-        debug_raw_response: null
+        // Try to include the prompt even in top-level errors
+        debug_prompt: typeof prompt !== 'undefined' ? prompt : 'Prompt definition failed or unavailable.',
+        debug_raw_response: null // Raw response likely unavailable here
     };
     console.log("Worker: Preparing 500 JSON response due to unhandled error.");
-    return new Response(JSON.stringify(errorPayload), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } // Add CORS
-    });
-  }
     return new Response(JSON.stringify(errorPayload), {
         status: 500,
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } // Add CORS
