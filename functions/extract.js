@@ -1,68 +1,112 @@
+// Bring back Hono and CORS if needed for structure, although not strictly necessary for a single function export
+import { Hono } from 'hono'; // Can remove if not using Hono routing/middleware features
+import { cors } from 'hono/cors'; // Can remove if not using Hono CORS
 
-// Remove Hono and CORS imports for this test
-// import { Hono } from 'hono';
-// import { cors } from 'hono/cors';
+// --- onRequest Handler (Primary Export) ---
+export const onRequestPost = async (context) => {
+  // Log entry point
+  console.log("Worker: onRequestPost invoked for path:", context.request.url);
 
-// Remove Hono app instantiation and routes
-// const app = new Hono();
-// app.use('*', cors());
-// app.post('/', async (c) => { ... });
-
-// --- Bare Minimum onRequest Handler ---
-export const onRequest = async (context) => {
-  // Log entry point - THIS IS THE MOST IMPORTANT LOG
-  console.log("Worker: onRequest invoked for path:", context.request.url);
-  console.log("Worker: Method:", context.request.method);
-
-  // Log environment variables (optional check)
-  try {
-    console.log("Worker: Checking for GEMINI_API_KEY presence:", !!context.env.GEMINI_API_KEY);
-  } catch (e) {
-    console.error("Worker: Error accessing context.env:", e);
-  }
-
-  // Immediately return a simple JSON response
-  const responsePayload = {
-    message: "Function invoked successfully!",
-    path: context.request.url,
-    method: context.request.method,
-    timestamp: new Date().toISOString(),
-  };
-
-  console.log("Worker: Attempting to return simple JSON response.");
-
-  try {
-    return new Response(JSON.stringify(responsePayload), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        // Add CORS headers manually for this direct response
-        'Access-Control-Allow-Origin': '*', // Adjust in production
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', // Allow methods
-        'Access-Control-Allow-Headers': 'Content-Type',
-      },
+  // --- Environment Variable Check ---
+  if (!context.env.GEMINI_API_KEY) {
+    console.error("Worker: GEMINI_API_KEY environment variable not set.");
+    const errorPayload = { error: 'Server configuration error: API key missing.' };
+    return new Response(JSON.stringify(errorPayload), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } // Add CORS
     });
-  } catch (responseError) {
-      console.error("Worker: Error creating simple response:", responseError);
-      // Fallback plain text error if Response creation fails
-      return new Response("Worker failed to create response.", { status: 500 });
+  }
+  const geminiApiKey = context.env.GEMINI_API_KEY;
+  const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${geminiApiKey}`;
+  console.log("Worker: API Key found. Using Gemini URL:", geminiApiUrl);
+
+  const prompt = "hello, how are you?"; // Static prompt for testing
+
+  try {
+    console.log("Worker: Using static prompt:", prompt);
+
+    // --- Prepare Payload for Gemini ---
+    const requestPayload = {
+      contents: [ { parts: [ { text: prompt } ] } ]
+    };
+    console.log("Worker: Request payload prepared for Gemini.");
+
+    // --- Call Gemini API ---
+    console.log("Worker: Sending request to Gemini API...");
+    const geminiResponse = await fetch(geminiApiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestPayload),
+    });
+    console.log(`Worker: Received response from Gemini API. Status: ${geminiResponse.status}`);
+
+    // --- Process Gemini Response (Focus on Raw Text) ---
+    const rawGeminiText = await geminiResponse.text(); // Get raw text response first
+    console.log("Worker: Raw text response from Gemini:", rawGeminiText);
+
+    // Prepare response payload (success or error)
+    let responsePayload;
+    let responseStatus;
+
+    if (!geminiResponse.ok) {
+      console.error(`Worker: Gemini API Error (${geminiResponse.status}): ${rawGeminiText}`);
+      let details = rawGeminiText;
+      try {
+          const googleError = JSON.parse(rawGeminiText);
+          details = googleError?.error?.message || rawGeminiText;
+      } catch(e) { /* Ignore parsing error, use raw text */ }
+
+      responseStatus = 500;
+      responsePayload = {
+          error: `Gemini API request failed: ${geminiResponse.statusText}`,
+          details: details,
+          debug_prompt: prompt,
+          debug_raw_response: rawGeminiText // Include raw response even on error
+      };
+      console.log("Worker: Preparing 500 JSON response due to Gemini API error.");
+
+    } else {
+      // Success case
+      responseStatus = 200;
+      responsePayload = {
+          // No 'extracted_data' as we removed JSON parsing expectation for LLM response
+          message: "Successfully received response from LLM.", // Add a success message
+          debug_prompt: prompt,
+          debug_raw_response: rawGeminiText // Return the raw text received
+      };
+      console.log("Worker: Preparing 200 JSON response with debug info.");
+    }
+
+    // Return the response
+    return new Response(JSON.stringify(responsePayload), {
+        status: responseStatus,
+        headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*' // Add CORS
+        }
+    });
+
+  } catch (error) {
+    // This catches errors during the fetch call or response processing
+    console.error('Worker: Unhandled error in onRequestPost logic:', error);
+    const errorPayload = {
+        error: 'An unexpected error occurred during worker execution.',
+        details: error.message,
+        stack_trace_debug: error.stack, // For Cloudflare logs
+        debug_prompt: prompt, // Include prompt if available
+        debug_raw_response: null
+    };
+    console.log("Worker: Preparing 500 JSON response due to unhandled error.");
+    return new Response(JSON.stringify(errorPayload), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } // Add CORS
+    });
   }
 };
 
-// Remove the helper function for now as it's not used
+// Keep the helper function if you plan to reintroduce file uploads later
 /*
 function arrayBufferToBase64(buffer) {
   // ...
 }
-*/
-
-// Remove the previous top-level try/catch around app.fetch as we removed 'app'
-/*
-export const onRequest = async (context) => {
-  try {
-    // ... app.fetch ...
-  } catch (err) {
-    // ... error handling ...
-  }
-};
 */
