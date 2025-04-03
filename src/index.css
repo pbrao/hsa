@@ -317,12 +317,13 @@ button:disabled {
   .results-section h2 { /* Add results-section h2 to light mode */
      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   }
-  /* Remove corresponding light mode rules */
-  /*
+
+  /* Add back light mode style for extracted JSON */
   .extracted-json-display {
      background-color: rgba(0, 0, 0, 0.05);
+     border-color: rgba(0, 0, 0, 0.1); /* Optional border */
   }
-  */
+
   /* Add styles for error box in light mode if needed */
   .results-section div[style*="color: red"] {
       background-color: rgba(255, 0, 0, 0.05) !important; /* Override inline style slightly */
