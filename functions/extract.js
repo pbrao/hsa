@@ -171,9 +171,13 @@ export const onRequestPost = async (context) => {
         const provider = jsonData.provider_name || "Not Found";
         const dateOfService = jsonData.date_of_service; // Get the date value
 
-        // --- ADD VALIDATION FOR date_of_service ---
+        // --- ADD SPECIFIC LOGGING BEFORE VALIDATION ---
+        console.log(`Worker: Validating dateOfService. Value: "${dateOfService}", Type: ${typeof dateOfService}`);
+        // --- END SPECIFIC LOGGING ---
+
+        // --- VALIDATION FOR date_of_service ---
         if (!dateOfService || dateOfService === "Not Found") {
-            console.error("Worker: Validation failed - date_of_service is missing or 'Not Found' in LLM response:", jsonData);
+            console.error("Worker: Validation failed - date_of_service is missing or 'Not Found'. Parsed JSON:", jsonData); // Log the whole JSON object on failure
             throw new Error("LLM did not provide a valid 'date_of_service'. Cannot insert into database.");
         }
         // --- END VALIDATION ---
