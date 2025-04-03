@@ -1,6 +1,20 @@
 // Bring back Hono and CORS if needed for structure, although not strictly necessary for a single function export
 import { Hono } from 'hono'; // Can remove if not using Hono routing/middleware features
 import { cors } from 'hono/cors'; // Can remove if not using Hono CORS
+// Import Supabase client
+import { createClient } from '@supabase/supabase-js';
+
+// --- Helper Function ---
+// Uncomment or add this back
+function arrayBufferToBase64(buffer) {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary); // btoa is available in Cloudflare Workers environment
+}
 
 // --- onRequest Handler (Primary Export) ---
 export const onRequestPost = async (context) => {
@@ -20,6 +34,24 @@ export const onRequestPost = async (context) => {
   // Ensure you are using a model that supports PDF input, like 1.5 Pro
   const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${geminiApiKey}`;
   console.log("Worker: API Key found. Using Gemini URL:", geminiApiUrl);
+
+  // Supabase Credentials Check
+  const supabaseUrl = context.env.SUPABASE_URL;
+  const supabaseKey = context.env.SUPABASE_SERVICE_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+      console.error("Worker: SUPABASE_URL or SUPABASE_SERVICE_KEY environment variables not set.");
+      const errorPayload = { error: 'Server configuration error: Database credentials missing.' };
+      return new Response(JSON.stringify(errorPayload), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      });
+  }
+  console.log("Worker: Supabase credentials found.");
+
+  // --- Initialize Supabase Client ---
+  // Use service_role key for server-side operations
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  console.log("Worker: Supabase client initialized.");
 
   // Define the extraction prompt
   const prompt = `
@@ -132,27 +164,75 @@ export const onRequestPost = async (context) => {
         // Clean potential markdown formatting before parsing
         const cleanJsonString = rawGeminiText.trim().replace(/^```json\s*|```$/g, '');
         const jsonData = JSON.parse(cleanJsonString);
-        console.log("Worker: Successfully parsed LLM response as JSON.");
+        console.log("Worker: Successfully parsed LLM response as JSON:", jsonData);
 
+        // --- Prepare Data for Database Insertion ---
+        // Basic cleaning/validation - enhance as needed
+        const provider = jsonData.provider_name || "Not Found";
+        const dateOfService = jsonData.date_of_service; // TODO: Add date validation/parsing if needed
+        let cost = NaN;
+        if (jsonData.cost_of_service && jsonData.cost_of_service !== "Not Found") {
+            // Remove common currency symbols and commas, then parse
+            const costString = String(jsonData.cost_of_service).replace(/[$,]/g, '');
+            cost = parseFloat(costString);
+        }
+         // Check if cost is valid number, else default or handle error
+        if (isNaN(cost)) {
+            console.warn("Worker: Could not parse cost_of_service to a valid number. Raw:", jsonData.cost_of_service);
+            // Decide how to handle: set to 0, null, or throw error? Setting to 0 for now.
+            cost = 0;
+            // Alternatively, throw an error:
+            // throw new Error(`Invalid cost_of_service format: ${jsonData.cost_of_service}`);
+        }
+        // TODO: Add validation for dateOfService format if required by DB
+
+        const recordToInsert = {
+            service_provider: provider,
+            date_of_service: dateOfService, // Assumes format is compatible or DB handles conversion
+            cost_of_service: cost
+            // created_at is handled by DB default
+            // submitted_for_payment_date, payment_received_date are NULL initially
+        };
+
+        // --- Insert into Supabase ---
+        console.log("Worker: Attempting to insert into Supabase:", recordToInsert);
+        const { data: dbData, error: dbError } = await supabase
+          .from('hsa_receipts') // Your table name
+          .insert([recordToInsert]) // insert expects an array
+          .select(); // Optional: get the inserted row back
+
+        if (dbError) {
+          // Handle database insertion error
+          console.error("Worker: Supabase insert error:", dbError);
+          // Throw an error to be caught by the outer catch block
+          // This prevents sending a 200 OK to the client if DB fails
+          throw new Error(`Database insert failed: ${dbError.message}`);
+        }
+
+        console.log("Worker: Supabase insert successful:", dbData);
+
+        // --- Prepare Success Response ---
         responseStatus = 200;
         responsePayload = {
-            extracted_data: jsonData, // Nest the parsed data
+            extracted_data: jsonData, // Original LLM JSON
+            db_insert_status: "Success", // Add confirmation
+            db_inserted_record: dbData ? dbData[0] : null, // Optionally return inserted record
             debug_prompt: prompt,
-            debug_raw_response: rawGeminiText // Still include raw for comparison
+            debug_raw_response: rawGeminiText
         };
-        console.log("Worker: Preparing 200 JSON response with extracted data and debug info.");
+        console.log("Worker: Preparing 200 JSON response with extracted data and DB confirmation.");
 
-      } catch (parseError) {
-        console.error("Worker: Failed to parse successful LLM response as JSON:", parseError);
-        // LLM succeeded but didn't return valid JSON as requested
+      } catch (parseOrDbError) {
+        // Catch errors from JSON parsing OR database insertion
+        console.error("Worker: Error during LLM JSON parsing or DB insert:", parseOrDbError);
         responseStatus = 500; // Treat as server-side issue
         responsePayload = {
-            error: 'LLM response was not in the expected JSON format.',
-            details: parseError.message,
+            error: `Processing failed after successful LLM response: ${parseOrDbError.message}`,
+            details: parseOrDbError.message, // Redundant but okay
             debug_prompt: prompt,
-            debug_raw_response: rawGeminiText // Crucial to see what was returned
+            debug_raw_response: rawGeminiText // Crucial to see what LLM returned
         };
-        console.log("Worker: Preparing 500 JSON response due to LLM JSON parse error.");
+        console.log("Worker: Preparing 500 JSON response due to post-LLM processing error.");
       }
     }
 
@@ -183,15 +263,3 @@ export const onRequestPost = async (context) => {
     });
   }
 };
-
-// --- Helper Function ---
-// Uncomment or add this back
-function arrayBufferToBase64(buffer) {
-  let binary = '';
-  const bytes = new Uint8Array(buffer);
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary); // btoa is available in Cloudflare Workers environment
-}
