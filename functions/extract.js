@@ -169,7 +169,15 @@ export const onRequestPost = async (context) => {
         // --- Prepare Data for Database Insertion ---
         // Basic cleaning/validation - enhance as needed
         const provider = jsonData.provider_name || "Not Found";
-        const dateOfService = jsonData.date_of_service; // TODO: Add date validation/parsing if needed
+        const dateOfService = jsonData.date_of_service; // Get the date value
+
+        // --- ADD VALIDATION FOR date_of_service ---
+        if (!dateOfService || dateOfService === "Not Found") {
+            console.error("Worker: Validation failed - date_of_service is missing or 'Not Found' in LLM response:", jsonData);
+            throw new Error("LLM did not provide a valid 'date_of_service'. Cannot insert into database.");
+        }
+        // --- END VALIDATION ---
+
         let cost = NaN;
         if (jsonData.cost_of_service && jsonData.cost_of_service !== "Not Found") {
             // Remove common currency symbols and commas, then parse
@@ -188,7 +196,7 @@ export const onRequestPost = async (context) => {
 
         const recordToInsert = {
             service_provider: provider,
-            date_of_service: dateOfService, // Assumes format is compatible or DB handles conversion
+            date_of_service: dateOfService, // Use the validated date
             cost_of_service: cost
             // created_at is handled by DB default
             // submitted_for_payment_date, payment_received_date are NULL initially
@@ -223,11 +231,11 @@ export const onRequestPost = async (context) => {
         console.log("Worker: Preparing 200 JSON response with extracted data and DB confirmation.");
 
       } catch (parseOrDbError) {
-        // Catch errors from JSON parsing OR database insertion
-        console.error("Worker: Error during LLM JSON parsing or DB insert:", parseOrDbError);
+        // Catch errors from JSON parsing, VALIDATION, OR database insertion
+        console.error("Worker: Error during LLM JSON parsing, validation, or DB insert:", parseOrDbError);
         responseStatus = 500; // Treat as server-side issue
         responsePayload = {
-            error: `Processing failed after successful LLM response: ${parseOrDbError.message}`,
+            error: `Processing failed after successful LLM response: ${parseOrDbError.message}`, // Error message will now include validation failure
             details: parseOrDbError.message, // Redundant but okay
             debug_prompt: prompt,
             debug_raw_response: rawGeminiText // Crucial to see what LLM returned
