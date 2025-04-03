@@ -165,11 +165,11 @@ button:focus-visible {
    margin-bottom: 1rem;
 }
 
-/* Remove these rules if no longer needed */
-/*
+/* Add back or ensure these styles exist */
 .upload-section input[type="file"] {
-  display: block;
-  margin-bottom: 1rem;
+  display: block; /* Or inline-block, depending on desired layout */
+  margin-top: 0.5rem; /* Add some space above */
+  margin-bottom: 0.5rem; /* Add some space below */
   color: inherit;
   padding: 0.5em 0.75em;
   border: 1px solid rgba(255, 255, 255, 0.3);
