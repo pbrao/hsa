@@ -54,12 +54,13 @@ export const onRequestPost = async (context) => {
   console.log("Worker: Supabase client initialized.");
 
   // Define the extraction prompt
+  // Define the extraction prompt
   const prompt = `
     Analyze the content of the provided PDF document, which is an HSA receipt or medical bill.
     Extract the following information precisely:
-    1. Provider Name: The name of the clinic, hospital, doctor, or pharmacy.
-    2. Date of Service: The specific date the service was rendered or the item was purchased. Format as YYYY-MM-DD if possible, otherwise use the format present. If multiple dates exist, use the primary service date or the latest one shown.
-    3. Cost of Service: The total amount paid or due by the patient for the service/item. Extract only the final numerical value, excluding currency symbols initially.
+    1. Provider Name: The name of the clinic, hospital, doctor, or pharmacy. If this cannot be reasonably determined, use the string "Not Found".
+    2. Date of Service: The specific date the service was rendered or the item was purchased. Look for labels like 'Service Date', 'Date', 'Transaction Date'. Format as YYYY-MM-DD if possible, otherwise use the format present. If multiple dates exist, use the primary service date or the latest one shown. **It is crucial to return a date value; do not return "Not Found" for this field.** Make the best determination possible from the document content.
+    3. Cost of Service: The total amount paid or due by the patient for the service/item. Extract only the final numerical value, excluding currency symbols initially. If this cannot be reasonably determined, use the string "Not Found".
 
     Return the extracted information ONLY in a valid JSON object format like this:
     {
@@ -68,7 +69,6 @@ export const onRequestPost = async (context) => {
       "cost_of_service": "..."
     }
     Do not include any explanatory text, markdown formatting (like \`\`\`json), or anything else before or after the JSON object itself.
-    If any piece of information cannot be reasonably determined from the document, use the string "Not Found" as the value for that specific key in the JSON object.
   `;
 
   try {
