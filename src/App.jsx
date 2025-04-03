@@ -4,8 +4,8 @@ import React, { useState } from 'react';
 // No other imports needed for this change
 
 function App() {
-  // Remove selectedFile state
-  // const [selectedFile, setSelectedFile] = useState(null);
+  // Add back selectedFile state
+  const [selectedFile, setSelectedFile] = useState(null);
   // Remove extractedData state
   // const [extractedData, setExtractedData] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -14,16 +14,37 @@ function App() {
   const [debugPrompt, setDebugPrompt] = useState('');
   const [debugRawResponse, setDebugRawResponse] = useState('');
 
-  // Remove handleFileChange function
-  /*
+  // Add back handleFileChange function
   const handleFileChange = (event) => {
-    // ... removed ...
+    const file = event.target.files[0];
+    // Reset state when a new file is selected or selection is cleared
+    setSelectedFile(null);
+    setProcessingError('');
+    setDebugPrompt('');
+    setDebugRawResponse('');
+
+    // Accept only PDF for now, adjust if needed later
+    if (file && file.type === 'application/pdf') {
+      setSelectedFile(file);
+      console.log("PDF file selected:", file.name);
+    } else {
+      setSelectedFile(null); // Ensure state is null if not PDF
+      if (file) { // Only show error if a file was selected but wasn't PDF
+          alert('Please select a PDF file.');
+      }
+    }
   };
-  */
+
 
   // Modify the upload handler
   const handleUpload = async () => {
     console.log('[handleUpload] Function started.'); // Step 1
+
+    // Add back check for selectedFile
+    if (!selectedFile) {
+      alert("Please select a PDF file first!");
+      return; // Stop if no file is selected
+    }
 
     console.log('[handleUpload] Setting processing state to true...'); // Step 2
     setIsProcessing(true);
@@ -32,14 +53,26 @@ function App() {
     setDebugRawResponse('');
     console.log('[handleUpload] State cleared and isProcessing set.'); // Step 3
 
+    // Add back FormData creation
+    console.log('[handleUpload] Creating FormData...'); // New Step 3a
+    const formData = new FormData();
+    // Use the key expected by the worker (needs to be updated later)
+    formData.append('pdfFile', selectedFile);
+    console.log('[handleUpload] Appended file to FormData.'); // New Step 3b
+
+
     let response;
     let rawResponseText = '';
 
     try {
       console.log('[handleUpload] Entering try block. Preparing fetch...'); // Step 4
-      console.log('[handleUpload] Sending POST request to /extract...'); // Step 5
+      console.log('[handleUpload] Sending POST request to /extract with file data...'); // Step 5 (Updated log)
       response = await fetch('/extract', {
         method: 'POST',
+        // Send the FormData object as the body
+        body: formData,
+        // NOTE: Do NOT set Content-Type header manually when sending FormData;
+        // the browser sets it correctly (multipart/form-data) with the boundary.
       });
       console.log('[handleUpload] Fetch call completed.'); // Step 6
 
@@ -126,20 +159,31 @@ function App() {
       <main className="app-main">
         {/* Modify upload section */}
         <section className="upload-section">
-          <h2>Trigger LLM Test</h2>
-          {/* Remove file input and selected file display */}
-          {/*
-          <input ... />
-          {selectedFile && ( <p>...</p> )}
-          */}
-          <p>Click the button to send a static prompt ("hello, how are you?") to the LLM via the Cloudflare Worker.</p>
+          {/* Update section title */}
+          <h2>Upload PDF Receipt</h2>
+          {/* Add back file input */}
+          <input
+            id="file-upload"
+            type="file"
+            accept="application/pdf" // Specify PDF acceptance
+            onChange={handleFileChange}
+            className="file-input" // Add class if you have specific styles
+            aria-label="PDF upload input"
+            disabled={isProcessing} // Disable while processing
+          />
+          {/* Add back selected file display */}
+          {selectedFile && !isProcessing && ( // Show only if file selected and not processing
+             <p style={{ marginTop: '0.5rem', fontStyle: 'italic' }}>Selected: {selectedFile.name}</p>
+          )}
+          {/* Update button text and disabled logic */}
           <button
              onClick={handleUpload}
-             // Only disable when processing
-             disabled={isProcessing}
+             // Disable if no file selected OR if processing
+             disabled={!selectedFile || isProcessing}
              style={{ marginTop: '1rem' }}
           >
-            {isProcessing ? 'Sending...' : 'Send Test Prompt'}
+            {/* Update button text */}
+            {isProcessing ? 'Processing...' : 'Process Receipt'}
           </button>
         </section>
 
@@ -185,9 +229,9 @@ function App() {
           )}
 
 
-          {/* Adjust placeholder text */}
+          {/* Update placeholder text */}
           {!isProcessing && !processingError && !debugPrompt && !debugRawResponse && (
-            <p>Click the "Send Test Prompt" button to see the prompt sent and raw response received from the LLM.</p>
+            <p>Upload a PDF receipt and click "Process Receipt" to see processing details.</p>
           )}
         </section>
 

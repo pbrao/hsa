@@ -175,9 +175,10 @@ button:focus-visible {
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 4px;
   background-color: rgba(255, 255, 255, 0.05);
-  max-width: 100%;
+  max-width: 100%; /* Prevent overflow */
+  cursor: pointer; /* Indicate it's clickable */
 }
-*/
+
 
 /* Light mode adjustments */
 @media (prefers-color-scheme: light) {
@@ -185,8 +186,7 @@ button:focus-visible {
   .upload-section h2 { /* Keep this if .upload-section exists */
      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   }
-  /* Remove corresponding light mode rules if they only applied to the file input */
-  /*
+  /* Add back corresponding light mode styles if needed */
    .upload-section input[type="file"] {
     border: 1px solid rgba(0, 0, 0, 0.2);
     background-color: rgba(0, 0, 0, 0.02);
