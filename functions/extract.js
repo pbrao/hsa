@@ -17,7 +17,7 @@ export const onRequestPost = async (context) => {
     });
   }
   const geminiApiKey = context.env.GEMINI_API_KEY;
-  const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${geminiApiKey}`;
+  const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-exp-03-25:generateContent?key=${geminiApiKey}`;
   console.log("Worker: API Key found. Using Gemini URL:", geminiApiUrl);
 
   const prompt = "hello, how are you?"; // Static prompt for testing
