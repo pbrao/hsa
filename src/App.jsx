@@ -6,8 +6,8 @@ import React, { useState } from 'react';
 function App() {
   // Add back selectedFile state
   const [selectedFile, setSelectedFile] = useState(null);
-  // Remove extractedData state
-  // const [extractedData, setExtractedData] = useState(null);
+  // Add back extractedData state
+  const [extractedData, setExtractedData] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingError, setProcessingError] = useState('');
   // Add state for debug info
@@ -19,6 +19,8 @@ function App() {
     const file = event.target.files[0];
     // Reset state when a new file is selected or selection is cleared
     setSelectedFile(null);
+    // Clear all results/errors/debug on new file selection
+    setExtractedData(null);
     setProcessingError('');
     setDebugPrompt('');
     setDebugRawResponse('');
@@ -48,6 +50,8 @@ function App() {
 
     console.log('[handleUpload] Setting processing state to true...'); // Step 2
     setIsProcessing(true);
+    // Clear previous results/errors/debug
+    setExtractedData(null);
     setProcessingError('');
     setDebugPrompt('');
     setDebugRawResponse('');
@@ -105,25 +109,41 @@ function App() {
       console.log('[handleUpload] Set debugRawResponse state.'); // Step 12b
 
 
-      console.log(`[handleUpload] Checking if response status is OK (status: ${response.status})...`); // Step 13
+      // --- Conditional State Setting ---
       if (!response.ok) {
-        console.error('[handleUpload] Response status is NOT OK.'); // Step 14a (Error Path)
+        console.error('[handleUpload] Response status is NOT OK.');
+        // Set error and debug info ONLY on error
         const errorMessage = result?.error || `Request failed with status ${response.status}`;
         const errorDetails = result?.details ? ` Details: ${result.details}` : '';
-        console.error(`[handleUpload] Throwing error: ${errorMessage}${errorDetails}`); // Step 14b (Error Path)
-        throw new Error(`${errorMessage}${errorDetails}`);
+        setProcessingError(`${errorMessage}${errorDetails}`);
+        if (result?.debug_prompt) setDebugPrompt(result.debug_prompt);
+        setDebugRawResponse(result?.debug_raw_response || rawResponseText); // Show raw response on error
+        console.error(`[handleUpload] Error state set.`);
+        // No need to throw here, error state is set
+      } else {
+        // Response is OK (2xx status)
+        console.log('[handleUpload] Response status is OK.');
+        if (result?.extracted_data) {
+            // SUCCESS CASE: Extracted data found
+            setExtractedData(result.extracted_data);
+            console.log("[handleUpload] Successfully set extractedData state.");
+            // DO NOT set debug info here for clean success display
+        } else {
+            // OK response but missing expected data - treat as error/debug case
+            console.warn("[handleUpload] Response OK, but extracted_data missing from worker response.");
+            setProcessingError("Processing succeeded, but the expected data structure was not returned by the worker.");
+            // Set debug info in this specific failure case
+            if (result?.debug_prompt) setDebugPrompt(result.debug_prompt);
+            setDebugRawResponse(result?.debug_raw_response || rawResponseText);
+        }
       }
+      // --- End Conditional State Setting ---
 
-      // If response.ok is true:
-      console.log('[handleUpload] Response status is OK.'); // Step 15 (Success Path)
-      console.log("[handleUpload] Request successful, displaying debug info."); // Step 16 (Success Path)
-
-
-    } catch (error) {
+    } catch (error) { // Catches fetch errors, JSON parse errors, etc.
       console.error('[handleUpload] Caught error in main try block:', error); // Step 17 (Catch Block)
       let finalErrorMessage = `Failed to process request: ${error.message}`;
       setProcessingError(finalErrorMessage);
-      console.log('[handleUpload] Set processingError state.'); // Step 17a (Catch Block)
+      console.log('[handleUpload] Set processingError state in catch block.'); // Step 17a (Catch Block)
 
       // Ensure raw response debug state is set even on error if available
       if (rawResponseText && !debugRawResponse) {
@@ -142,6 +162,10 @@ function App() {
               console.warn('[handleUpload] Could not parse raw text for debug info during error handling. Setting raw text directly.'); // Step 17e (Catch Block)
               setDebugRawResponse(rawResponseText);
           }
+      } else if (rawResponseText && !debugRawResponse) {
+          // If error occurred but rawResponseText wasn't JSON, still set it for debug
+          setDebugRawResponse(rawResponseText);
+          console.log('[handleUpload] Set debugRawResponse state with raw text during error handling (non-JSON).');
       }
     } finally {
       console.log('[handleUpload] Entering finally block.'); // Step 18
@@ -187,51 +211,51 @@ function App() {
           </button>
         </section>
 
-        {/* Modify results/errors section to include debug info */}
+        {/* Results section - Conditional Rendering */}
         <section className="results-section">
-          <h2>Processing Details</h2>
+          {/* Title changes based on state */}
+          <h2>{extractedData ? "Extracted Data" : "Processing Details"}</h2>
+
           {isProcessing && (
-            <p>Sending request and waiting for LLM response...</p> // Update loading text
-          )}
-          {/* Show error message */}
-          {processingError && (
-            <div className="error-box">
-              <strong>Error:</strong> {processingError}
-            </div>
+            <p>Analyzing PDF with AI, please wait...</p> // Updated loading text
           )}
 
-          {/* --- Remove Extracted Data Section --- */}
-          {/*
-          {extractedData && !isProcessing && (
+          {/* Display Extracted Data on Success */}
+          {extractedData && !isProcessing && !processingError && (
             <div className="extracted-data-box">
-              <h3>Successfully Extracted Data:</h3>
+              {/* Use pre for formatted JSON */}
               <pre className="extracted-json-display">
                 {JSON.stringify(extractedData, null, 2)}
               </pre>
             </div>
           )}
-          */}
 
-          {/* Show Debug Prompt */}
-          {debugPrompt && (
-            <div className="debug-info-box">
-                <h3>Debug: Prompt Sent to LLM</h3>
-                <pre className="debug-prompt-display">{debugPrompt}</pre>
-            </div>
+          {/* Display Error and Debug Info ONLY if there's an error */}
+          {processingError && !isProcessing && (
+            <>
+              <div className="error-box">
+                <strong>Error:</strong> {processingError}
+              </div>
+              {/* Show Debug Prompt only if error occurred and prompt exists */}
+              {debugPrompt && (
+                <div className="debug-info-box">
+                    <h3>Debug: Prompt Sent to LLM</h3>
+                    <pre className="debug-prompt-display">{debugPrompt}</pre>
+                </div>
+              )}
+              {/* Show Debug Raw Response only if error occurred and raw response exists */}
+              {debugRawResponse && (
+                 <div className="debug-info-box">
+                    <h3>Debug: Raw Response from LLM</h3>
+                    <pre className="debug-raw-response-display">{debugRawResponse}</pre>
+                 </div>
+              )}
+            </>
           )}
 
-          {/* Show Debug Raw Response */}
-          {debugRawResponse && (
-             <div className="debug-info-box">
-                <h3>Debug: Raw Response from LLM</h3>
-                <pre className="debug-raw-response-display">{debugRawResponse}</pre>
-             </div>
-          )}
-
-
-          {/* Update placeholder text */}
-          {!isProcessing && !processingError && !debugPrompt && !debugRawResponse && (
-            <p>Upload a PDF receipt and click "Process Receipt" to see processing details.</p>
+          {/* Placeholder Text */}
+          {!isProcessing && !processingError && !extractedData && (
+            <p>Upload a PDF receipt and click "Process Receipt" to see the extracted JSON data.</p>
           )}
         </section>
 

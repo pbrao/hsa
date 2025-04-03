@@ -259,26 +259,25 @@ button:focus-visible {
 }
 
 
-/* Remove or comment out these rules */
-/*
+/* Add back or ensure these styles exist for successful JSON display */
 .extracted-data-box {
-    margin-bottom: 1rem;
+    margin-bottom: 1rem; /* Optional spacing */
 }
 
 .extracted-json-display {
   white-space: pre-wrap;
   word-wrap: break-word;
-  background-color: rgba(0, 0, 0, 0.15);
+  background-color: rgba(0, 0, 0, 0.15); /* Or your preferred background */
   padding: 1rem;
   border-radius: 4px;
-  max-height: 400px;
+  max-height: 500px; /* Adjust as needed */
   overflow-y: auto;
   font-family: monospace;
   font-size: 0.9em;
   color: inherit;
   text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.2); /* Optional border */
 }
-*/
 
 /* Box containing debug info */
 .debug-info-box {
@@ -334,9 +333,7 @@ button:disabled {
        color: #b30000 !important;
    }
 
-  .extracted-json-display {
-     background-color: rgba(0, 0, 0, 0.05);
-  }
+  /* .extracted-json-display light mode style moved up */
 
   .debug-info-box {
       border-top: 1px dashed rgba(0, 0, 0, 0.2);
